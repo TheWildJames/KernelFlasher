@@ -914,52 +914,13 @@ class SlotViewModel(
         }
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
-    fun flashImageDD(context: Context, uri: Uri, partitionName: String) {
+
+
+    fun flashAk3_fkm(context: Context, uri: Uri) {
         launch {
             _clearFlash()
-            addMessage("Copying image ...")
             _copyFile(context, uri)
-            val image = fileSystemManager!!.getFile(context.filesDir, flashFilename!!)
-            try {
-                if (image.exists()) {
-                    addMessage("Copied $flashFilename")
-                    _wasFlashSuccess.value = false
-                    addMessage("Flashing $flashFilename to $partitionName via dd ...")
-                    val blockDevice = PartitionUtil.findPartitionBlockDevice(context, partitionName, slotSuffix)
-                    if (blockDevice != null && blockDevice.exists()) {
-                        // FKM-style: direct dd write through shell, no pre-wipe zero
-                        val result = Shell.cmd(
-                            "dd if='$image' of='$blockDevice' bs=4K && sync"
-                        ).to(flashOutput, flashOutput).exec()
-                        if (result.isSuccess) {
-                            addMessage("Flashed $flashFilename to $partitionName$slotSuffix")
-                            addMessage("Cleaning up ...")
-                            clearTmp(context)
-                            addMessage("Done.")
-                            _wasFlashSuccess.value = true
-                        } else {
-                            log(context, "dd write failed", shouldThrow = true)
-                        }
-                    } else {
-                        log(context, "Partition $partitionName was not found", shouldThrow = true)
-                    }
-                } else {
-                    log(context, "Partition image is missing", shouldThrow = true)
-                }
-            } catch (e: Exception) {
-                clearFlash(context)
-                throw e
-            } finally {
-                addMessage("")
-                if (wasSlotReset) {
-                    resetSlot()
-                    viewModelScope.launch(Dispatchers.Main) {
-                        showCautionDialog()
-                    }
-                }
-                SharedViewModels.mainViewModel.markRefreshNeeded()
-            }
+            _flashAk3(context, "_fkm")
         }
     }
 }

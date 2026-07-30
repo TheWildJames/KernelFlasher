@@ -70,17 +70,15 @@ fun ColumnScope.SlotFlashContent(
 
     val isAk3 = currentRoute.contains("ak3")
     val isFlashImage = currentRoute.endsWith("/flash/image")
-    val isFlashImageDD = currentRoute.endsWith("/flash/image_dd")
     val isBackup = currentRoute.endsWith("/backup")
     val isBackupResult = currentRoute.endsWith("/backup/backup")
     var showBackupDialog by remember { mutableStateOf(false) }
     var customBackupName by remember { mutableStateOf("") }
     val isFlashAk3 = currentRoute.endsWith("/flash/ak3")
     val isImageFlashResult = currentRoute.endsWith("/flash/image/flash")
-    val isImageDDResult = currentRoute.endsWith("/flash/image_dd/flash")
-
+ 
     val isFlashScreen = currentRoute.endsWith("/flash")
-    val isSlotScreen = !(isFlashAk3 || isImageFlashResult || isBackupResult || isImageDDResult) // Not in Flashing Screen; So Its considered Slot Screen
+    val isSlotScreen = !(isFlashAk3 || isImageFlashResult || isBackupResult) // Not in Flashing Screen; So Its considered Slot Screen
 
     BackHandler(enabled = ((isFlashAk3 || isImageFlashResult || isBackupResult) && isRefreshing.value)) { }
 
@@ -111,43 +109,22 @@ fun ColumnScope.SlotFlashContent(
                 viewModel.flashActionURI = uri
                 viewModel.showConfirmDialog()
             })
-            OutlinedButton(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                shape = RoundedCornerShape(4.dp),
-                onClick = {
-                    navController.navigate("slot$slotSuffix/flash/image")
-                }
-            ) {
-                Text(stringResource(R.string.flash_partition_image))
-            }
-            OutlinedButton(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                shape = RoundedCornerShape(4.dp),
-                onClick = {
-                    navController.navigate("slot$slotSuffix/flash/image_dd")
-                }
-            ) {
-                Text(stringResource(R.string.flash_raw_image_dd))
-            }
+            FlashButton(stringResource(R.string.flash_partition_image), "img" ,callback = { uri ->
+                viewModel.flashActionType = "flashImage"
+                viewModel.flashActionURI = uri
+                viewModel.showConfirmDialog()
+            })
+            FlashButton(stringResource(R.string.flash_ak3_fkm), "zip" ,callback = { uri ->
+                viewModel.flashActionType = "flashAk3_fkm"
+                viewModel.flashActionURI = uri
+                viewModel.showConfirmDialog()
+            })
         } else if (isFlashImage) {
             DataCard (stringResource(R.string.flash_partition_image))
             Spacer(Modifier.height(5.dp))
             for (partitionName in PartitionUtil.AvailablePartitions) {
                 FlashButton(partitionName, "img" ,callback = { uri ->
                     viewModel.flashActionType = "flashImage"
-                    viewModel.flashActionURI = uri
-                    viewModel.flashActionPartName = partitionName
-                    viewModel.showConfirmDialog()
-                })
-            }
-        } else if (isFlashImageDD) {
-            DataCard (stringResource(R.string.flash_raw_image_dd))
-            Spacer(Modifier.height(5.dp))
-            for (partitionName in PartitionUtil.AvailablePartitions) {
-                FlashButton(partitionName, "img", callback = { uri ->
-                    viewModel.flashActionType = "flashImageDD"
                     viewModel.flashActionURI = uri
                     viewModel.flashActionPartName = partitionName
                     viewModel.showConfirmDialog()
@@ -363,15 +340,11 @@ fun ColumnScope.SlotFlashContent(
                                 )
                             }
 
-                            "flashImageDD" -> {
-                                navController.navigate("slot$slotSuffix/flash/image_dd/flash") {
+                            "flashAk3_fkm" -> {
+                                navController.navigate("slot$slotSuffix/flash/ak3") {
                                     popUpTo("slot$slotSuffix")
                                 }
-                                viewModel.flashImageDD(
-                                    context,
-                                    uri,
-                                    partitionName!!
-                                )
+                                viewModel.flashAk3_fkm(context, uri)
                             }
                         }
                         viewModel.flashActionType = ""
