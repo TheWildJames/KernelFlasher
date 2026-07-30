@@ -74,8 +74,7 @@ jobs:
           ./gradlew assembleRelease
           tree app/build/outputs/apk/release
 
-      - name: Generate debug keystore if no signing secrets
-        if: secrets.KEYSTORE == ''
+      - name: Generate debug keystore
         run: |
           keytool -genkey -v -keystore app/build/outputs/apk/release/debug.jks \
             -storetype JKS -alias debug -keyalg RSA -keysize 2048 \
