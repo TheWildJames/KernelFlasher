@@ -1,7 +1,6 @@
 #!/system/bin/sh
 
-## FKM Method B 1:1 — AK3 zip via switchroot-style chroot
-## Matches flash_ak3.sh setup + FKM A/B slot + /system busy
+## FKM Method B 1:1 — extracted from q5/b.java (switchroot chroot script)
 
 echo "Flash AK3 Zip (FKM)"
 echo "F=$F Z=$Z"
@@ -19,42 +18,58 @@ if [ $? -eq 0 ]; then
   mv $F/busybox_ak $F/busybox
 fi
 
-# Mount tmpfs for update-binary workspace (needed for AKHOME)
+# Mount tmpfs for update-binary workspace (replaces switchroot chroot)
 TMP=$F/tmp
 $F/busybox umount $TMP 2>/dev/null
 $F/busybox rm -rf $TMP 2>/dev/null
 $F/busybox mkdir -p $TMP
 $F/busybox mount -t tmpfs -o noatime tmpfs $TMP
 
-# FKM A/B slot detection
-echo "Detecting active slot ..."
-SLOT=$($F/busybox getprop ro.boot.slot_suffix 2>/dev/null)
-test "$SLOT" || SLOT=$($F/busybox grep -o 'androidboot.slot_suffix=[^ $]*' /proc/cmdline | $F/busybox cut -d= -f2)
-test "$SLOT" || SLOT="_a"
-echo "Slot: $SLOT"
-
-# FKM: create non-suffixed by-name symlinks
-echo "Creating by-name symlinks ..."
-for i in /dev/block/bootdevice/by-name/*$SLOT; do
-  j=$(echo "$i" | rev | cut -c3- | rev)
-  [ -e "$j" ] || $F/busybox ln -sf "$i" "$j" 2>/dev/null
-done
-
-# FKM: keep /system busy to prevent unmount
-echo "Keeping /system busy ..."
-/system/bin/sleep 20 &
-
 # Inject busybox into update-binary's AKHOME/tools (same as flash_ak3.sh)
 PATTERN='\$[Bb][Bb] chmod -R 755 tools bin;'
 sed -i "/$PATTERN/i cp -f \"\$F/busybox\" \$AKHOME/tools;" "$F/update-binary"
 
-# Run update-binary — same as flash_ak3.sh but with FKM slot setup
+# === FKM slot detection (exact copy from q5/b.java) ===
+echo "Detecting active slot ..."
+SLOT=$(getprop ro.boot.slot_suffix 2>/dev/null)
+test "$SLOT" || SLOT=$(grep -o 'androidboot.slot_suffix=[^ $]*' /proc/cmdline | cut -d\  -f1 | cut -d= -f2)
+if [ ! "$SLOT" ]; then
+  SLOT=$(getprop ro.boot.slot 2>/dev/null)
+  test "$SLOT" || SLOT=$(grep -o 'androidboot.slot=[^ $]*' /proc/cmdline | cut -d\  -f1 | cut -d= -f2)
+  test "$SLOT" && SLOT=_$SLOT
+fi
+echo "Slot: $SLOT"
+
+# FKM: create non-suffixed by-name symlinks (exact copy)
+echo "Creating by-name symlinks ..."
+if [ "$SLOT" ]; then
+  for i in /dev/block/bootdevice/by-name/*$SLOT; do
+    j=$(echo $i | rev | cut -c3- | rev)
+    if [ ! -e "$j" ]; then
+      ln -sf $i $j
+      LINKS="$LINKS$j "
+    fi
+  done
+fi
+
+# FKM: generate /etc/fstab from /proc/mounts
+mkdir /etc 2>/dev/null
+grep -E ' /system | /vendor | /product | /data | /cache | /persist ' /proc/mounts | sed 's;/dev/root;/dev/block/bootdevice/by-name/system;' | awk '{ print $1, $2, $3, $4 }' > /etc/fstab 2>/dev/null
+
+# FKM: make /system busy to avoid unmount
+echo "Keeping /system busy ..."
+/system/bin/sleep 20 &
+
+# Run update-binary — same as FKM: ash /tmp/update-binary 3 1 "$Z"
 echo "Running update-binary ..."
 AKHOME=$TMP/anykernel $F/busybox ash $F/update-binary 3 1 "$Z"
 RC=$?
 echo "update-binary exit code: $RC"
 
-# Cleanup — same as flash_ak3.sh
+# FKM: clean up tracked symlinks
+test "$LINKS" && rm -f $LINKS
+
+# Cleanup tmpfs workspace (same as flash_ak3.sh)
 $F/busybox umount $TMP
 $F/busybox rm -rf $TMP
 $F/busybox mount -o ro,remount -t auto /
