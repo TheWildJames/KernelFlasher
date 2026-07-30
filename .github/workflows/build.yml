@@ -74,18 +74,29 @@ jobs:
           ./gradlew assembleRelease
           tree app/build/outputs/apk/release
 
+      - name: Generate debug keystore if no signing secrets
+        if: secrets.KEYSTORE == ''
+        run: |
+          keytool -genkey -v -keystore app/build/outputs/apk/release/debug.jks \
+            -storetype JKS -alias debug -keyalg RSA -keysize 2048 \
+            -validity 10000 -storepass android -keypass android \
+            -dname "CN=Debug, OU=, O=, L=, S=, C="
+          echo "KEYSTORE_BASE64=$(base64 -w0 app/build/outputs/apk/release/debug.jks)" >> $GITHUB_ENV
+          echo "KEY_ALIAS=debug" >> $GITHUB_ENV
+          echo "KEYSTORE_PASSWORD=android" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=android" >> $GITHUB_ENV
+
       - uses: r0adkll/sign-android-release@v1.0.4
         name: Sign app APK
-        if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         id: sign_app
         with:
           releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.KEYSTORE }}
-          alias: ${{ secrets.KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
+          signingKeyBase64: ${{ secrets.KEYSTORE || env.KEYSTORE_BASE64 }}
+          alias: ${{ secrets.KEY_ALIAS || env.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD || env.KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD || env.KEY_PASSWORD }}
         env:
-          BUILD_TOOLS_VERSION: "35.0.0"
+          BUILD_TOOLS_VERSION: "37.0.0"
 
       - name: Rename APK
         if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
