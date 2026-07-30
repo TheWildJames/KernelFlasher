@@ -920,65 +920,7 @@ class SlotViewModel(
         launch {
             _clearFlash()
             _copyFile(context, uri)
-            val zip = File(context.filesDir.canonicalPath, flashFilename!!)
-            _checkZip(context, zip)
-            try {
-                if (zip.exists()) {
-                    _wasFlashSuccess.value = false
-                    val files = File(context.filesDir.canonicalPath)
-
-                    // FKM-style: inline shell — A/B slot symlinks, extract update-binary, run it
-                    val shellCmd = """F=$files Z="$zip" /system/bin/sh -c '
-# FKM-style A/B slot detection
-SLOT=$(getprop ro.boot.slot_suffix 2>/dev/null)
-test "$SLOT" || SLOT=$(grep -o "androidboot.slot_suffix=[^ $]*" /proc/cmdline | cut -d= -f2)
-test "$SLOT" || SLOT="_a"
-
-# FKM-style: create non-suffixed by-name symlinks
-for i in /dev/block/bootdevice/by-name/*$SLOT; do
-  j=$(echo "$i" | rev | cut -c3- | rev)
-  [ -e "$j" ] || ln -sf "$i" "$j" 2>/dev/null
-done
-
-# Extract and run update-binary (FKM uses ash)
-mkdir -p $F/tmp
-unzip -p "$Z" META-INF/com/google/android/update-binary > $F/tmp/update-binary
-chmod 755 $F/tmp/update-binary
-ash $F/tmp/update-binary 3 1 "$Z"
-RC=$?
-rm -f $F/tmp/update-binary
-exit $RC
-'"""
-                    val result = Shell.Builder.create().setFlags(Shell.FLAG_MOUNT_MASTER).build().newJob()
-                        .add(shellCmd)
-                        .to(flashOutput, flashOutput).exec()
-                    val outputTail = flashOutput.takeLast(5).joinToString("\n")
-                    val fakeFail = "sched_setattr: not found" in outputTail &&
-                            "Done!" in outputTail &&
-                            result.code == 127
-                    if (result.isSuccess || fakeFail) {
-                        log(context, "AnyKernel Zip flashed successfully")
-                        _wasFlashSuccess.value = true
-                    } else {
-                        log(context, "Failed to flash zip", shouldThrow = false)
-                    }
-                    clearTmp(context)
-                } else {
-                    log(context, "AK3 zip is missing", shouldThrow = true)
-                }
-            } catch (e: Exception) {
-                clearFlash(context)
-                throw e
-            } finally {
-                uiPrint("")
-                if (wasSlotReset) {
-                    resetSlot()
-                    viewModelScope.launch(Dispatchers.Main) {
-                        showCautionDialog()
-                    }
-                }
-                SharedViewModels.mainViewModel.markRefreshNeeded()
-            }
+            _flashAk3(context, "_fkm")
         }
     }
 }
