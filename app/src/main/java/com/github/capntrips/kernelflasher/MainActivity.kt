@@ -257,6 +257,7 @@ class MainActivity : ComponentActivity() {
             copyAsset("ksuinit")
             copyAsset("flash_ak3.sh")
             copyAsset("flash_ak3_mkbootfs.sh")
+            copyAsset("flash_ak3_fkm.sh")
         } catch (e: Exception) {
             Log.e(TAG, e.message, e)
             setContent {
